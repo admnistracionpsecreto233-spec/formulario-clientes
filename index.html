@@ -38,13 +38,9 @@
 
         .logo h1 {
             color: #2d3748;
-            font-size: 28px;
+            font-size: 32px;
             margin-bottom: 5px;
-        }
-
-        .logo p {
-            color: #718096;
-            font-size: 14px;
+            font-weight: 700;
         }
 
         .form-group {
@@ -171,8 +167,7 @@
 <body>
     <div class="container">
         <div class="logo">
-            <h1>Registro Base de datos.</h1>
-            <p>Registro de Cliente</p>
+            <h1>¡Regístrate en Punto Secreto!</h1>
         </div>
 
         <form id="clientForm">
@@ -183,22 +178,12 @@
                     id="rut" 
                     name="rut" 
                     required 
-                    placeholder="Ej: 12345678"
+                    placeholder="Ej: 12.345.678-9"
                     autocomplete="off"
+                    maxlength="12"
                 >
                 <div id="rutValidation" class="validation-message"></div>
-                <p class="helper-text">Ingresa solo números, sin puntos ni guión</p>
-            </div>
-
-            <div class="form-group">
-                <label for="telefono">Teléfono <span class="required">*</span></label>
-                <input 
-                    type="tel" 
-                    id="telefono" 
-                    name="telefono" 
-                    required 
-                    placeholder="Ej: +56912345678"
-                >
+                <p class="helper-text">Formato automático con puntos y guión</p>
             </div>
 
             <div class="form-group">
@@ -209,6 +194,27 @@
                     name="nombre" 
                     required 
                     placeholder="Nombre completo"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="fechaCumpleanos">Fecha de nacimiento <span class="required">*</span></label>
+                <input 
+                    type="date" 
+                    id="fechaCumpleanos" 
+                    name="fechaCumpleanos" 
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="telefono">Teléfono <span class="required">*</span></label>
+                <input 
+                    type="tel" 
+                    id="telefono" 
+                    name="telefono" 
+                    required 
+                    placeholder="Ej: +56912345678"
                 >
             </div>
 
@@ -226,12 +232,12 @@
             </div>
 
             <button type="submit" class="submit-btn" id="submitBtn">
-                Registrar Cliente
+                Enviar
             </button>
         </form>
 
         <div id="successMessage" class="success-message">
-            ✅ ¡Cliente registrado exitosamente!
+            ✅ ¡Te has registrado satisfactoriamente!
         </div>
     </div>
 
@@ -256,10 +262,98 @@
         let isRutValid = false;
         let isCorreoValid = false;
 
-        // Validar RUT en tiempo real
-        rutInput.addEventListener('input', function() {
+        // Función para formatear RUT chileno
+        function formatRut(value) {
+            // Remover todo excepto números y K
+            value = value.replace(/[^0-9kK]/g, '').toUpperCase();
+            
+            // Limitar a 9 caracteres (8-9 dígitos + DV)
+            if (value.length > 9) {
+                value = value.substring(0, 9);
+            }
+            
+            if (value.length <= 1) {
+                return value;
+            }
+            
+            // Separar dígito verificador
+            const dv = value.slice(-1);
+            let rut = value.slice(0, -1);
+            
+            // Formatear con puntos
+            let formatted = '';
+            let counter = 0;
+            for (let i = rut.length - 1; i >= 0; i--) {
+                formatted = rut[i] + formatted;
+                counter++;
+                if (counter === 3 && i !== 0) {
+                    formatted = '.' + formatted;
+                    counter = 0;
+                }
+            }
+            
+            return formatted + '-' + dv;
+        }
+
+        // Función para limpiar RUT (solo números y K)
+        function cleanRut(rut) {
+            return rut.replace(/[^0-9kK]/g, '').toUpperCase();
+        }
+
+        // Función para validar formato de RUT chileno
+        function validarRutChileno(rut) {
+            // Limpiar RUT
+            rut = cleanRut(rut);
+            
+            // Debe tener entre 8 y 9 caracteres
+            if (rut.length < 8 || rut.length > 9) {
+                return false;
+            }
+            
+            // Separar cuerpo y dígito verificador
+            const cuerpo = rut.slice(0, -1);
+            const dv = rut.slice(-1);
+            
+            // Calcular dígito verificador
+            let suma = 0;
+            let multiplo = 2;
+            
+            for (let i = cuerpo.length - 1; i >= 0; i--) {
+                suma += parseInt(cuerpo[i]) * multiplo;
+                multiplo = multiplo === 7 ? 2 : multiplo + 1;
+            }
+            
+            const resto = suma % 11;
+            const dvEsperado = 11 - resto;
+            let dvCalculado;
+            
+            if (dvEsperado === 11) {
+                dvCalculado = '0';
+            } else if (dvEsperado === 10) {
+                dvCalculado = 'K';
+            } else {
+                dvCalculado = dvEsperado.toString();
+            }
+            
+            return dv === dvCalculado;
+        }
+
+        // Validar RUT en tiempo real con formateo
+        rutInput.addEventListener('input', function(e) {
+            const cursorPosition = this.selectionStart;
+            const oldValue = this.value;
+            const oldLength = oldValue.length;
+            
+            // Formatear el valor
+            this.value = formatRut(this.value);
+            
+            // Ajustar posición del cursor
+            const newLength = this.value.length;
+            const diff = newLength - oldLength;
+            this.setSelectionRange(cursorPosition + diff, cursorPosition + diff);
+            
             clearTimeout(validationTimeout);
-            const rut = this.value.trim();
+            const rut = cleanRut(this.value);
 
             if (rut.length === 0) {
                 resetRutValidation();
@@ -267,15 +361,30 @@
                 return;
             }
 
-            // Mostrar mensaje de verificación
-            rutValidation.className = 'validation-message checking';
-            rutValidation.innerHTML = '<span class="spinner"></span> Verificando RUT...';
-            rutInput.className = '';
+            // Validar formato solo si tiene la longitud mínima
+            if (rut.length >= 8) {
+                if (!validarRutChileno(rut)) {
+                    rutValidation.className = 'validation-message error';
+                    rutValidation.innerHTML = '❌ RUT inválido';
+                    rutInput.className = 'error';
+                    isRutValid = false;
+                    checkFormValidity();
+                    return;
+                }
 
-            // Esperar 800ms después de que el usuario deje de escribir
-            validationTimeout = setTimeout(() => {
-                checkRutDuplicate(rut);
-            }, 800);
+                // Mostrar mensaje de verificación
+                rutValidation.className = 'validation-message checking';
+                rutValidation.innerHTML = '<span class="spinner"></span> Verificando RUT...';
+                rutInput.className = '';
+
+                // Esperar 800ms después de que el usuario deje de escribir
+                validationTimeout = setTimeout(() => {
+                    checkRutDuplicate(rut);
+                }, 800);
+            } else {
+                resetRutValidation();
+                checkFormValidity();
+            }
         });
 
         // Validar Correo en tiempo real
@@ -329,10 +438,10 @@
 
                 const data = await response.json();
                 
-                // Buscar RUT duplicado
+                // Buscar RUT duplicado (comparar sin formato)
                 const duplicado = data.records.find(record => {
                     const rutEnBase = record.fields['Rut.'];
-                    return rutEnBase && rutEnBase.toString().trim() === rut;
+                    return rutEnBase && cleanRut(rutEnBase.toString()) === cleanRut(rut);
                 });
 
                 if (duplicado) {
@@ -447,8 +556,9 @@
                 const formData = {
                     fields: {
                         'Rut.': rutInput.value.trim(),
-                        'Teléfono': document.getElementById('telefono').value.trim(),
                         'Nombre': document.getElementById('nombre').value.trim(),
+                        'Fecha Cumpleaños': document.getElementById('fechaCumpleanos').value,
+                        'Teléfono': document.getElementById('telefono').value.trim(),
                         'Correo Electrónico': document.getElementById('correo').value.trim()
                     }
                 };
@@ -484,7 +594,7 @@
                 alert('Hubo un error al registrar el cliente. Por favor intenta nuevamente.');
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = 'Registrar Cliente';
+                submitBtn.innerHTML = 'Enviar';
             }
         });
     </script>
